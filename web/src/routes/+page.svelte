@@ -1,35 +1,94 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import logo from '$lib/assets/logo.png';
 
 	export let data;
 	const supportAgentCanonicalName = 'FosterNation Support';
 
-	const supportPhoto =
-		'https://images.squarespace-cdn.com/content/v1/583e230be6f2e18631efa102/1485506057497-Q64Y11TXE0964O5INDNY/foster-nation-logo-sm.png?format=750w';
+	const supportPhoto = logo;
 	let userPhoto =
 		'https://lh3.googleusercontent.com/ogw/AF2bZyicnTwSQZiGntwl6IwI62iTdhymicA3xPQiROxh2jUtV1U=s64-c-mo';
 
 	let currentMessage: string = '';
-	let sendState: boolean = false;
+	let sendState: boolean = true;
 
 	let messages: {
 		message: string;
-		// picture: string;
+		type: string;
 		sender: string;
+		dichot?: Question;
 	}[] = [
 		{
 			message: 'Hello! How can I help you today?',
-			sender: supportAgentCanonicalName
+			sender: supportAgentCanonicalName,
+			type: 'dichot'
+		},
+		{
+			message: 'Hello! How can I help you today?',
+			sender: 'User',
+			type: 'dichot'
 		}
 	];
 
+	interface Option {
+		option: string;
+		image?: string;
+		question?: string;
+		result?: Result;
+		options?: Option[];
+	}
+
+	interface Question {
+		question?: string;
+		image?: string;
+		options?: Option[];
+	}
+
+	interface Result {
+		result: string;
+		description: string;
+		solution: string[];
+	}
+
+	var displayDichot: Question = {};
+
+	var route: string[] = [];
+
+	async function handleClick(route: string[]) {
+		const response = await fetch('/api/dichot', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ route: route })
+		});
+		let data = await response.json();
+		data = data.response;
+		console.log(data);
+		if (data.result) {
+			sendState = false;
+		}
+		messages = [
+			...messages,
+			{
+				message: data.question,
+				sender: supportAgentCanonicalName,
+				type: 'dichot',
+				dichot: data
+			}
+		];
+	}
+
 	onMount(() => {
+		var messageBody = document.querySelector('#chat-container');
+		messageBody.scrollTop = messageBody.scrollHeight - messageBody.clientHeight;
 		if (!data.isAuthenticated) {
 			goto('/api/auth/login');
 		} else {
 			console.log('User is authenticated');
 			userPhoto = data.user.picture ?? userPhoto;
+			handleClick(route);
 		}
 	});
 
@@ -41,7 +100,8 @@
 			...messages,
 			{
 				message: tempMessage,
-				sender: 'User'
+				sender: 'User',
+				type: 'gpt'
 			}
 		];
 		const response = await fetch('/api/message', {
@@ -62,7 +122,8 @@
 				...messages,
 				{
 					message: data.response,
-					sender: supportAgentCanonicalName
+					sender: supportAgentCanonicalName,
+					type: 'gpt'
 				}
 			];
 			currentMessage = '';
@@ -73,35 +134,103 @@
 	}
 </script>
 
-<section class="p-5">
-	<div>
+<section class="">
+	<div class="p-5">
 		<!-- <button class="btn btn-primary" on:click={() => goto('/api/auth/logout')}> Logout </button> -->
 		<h1>FosterNation Helpdesk</h1>
 		<p>Hi there! We are here to help.</p>
 	</div>
-	<div>
-		{#each messages as { message, sender }, i}
-			<div class={`chat  ${sender === supportAgentCanonicalName ? 'chat-start' : 'chat-end'}`}>
-				<div class="chat-image avatar">
-					<div class="w-10 rounded-full">
-						<img
-							alt="User avatar"
-							src={sender === supportAgentCanonicalName ? supportPhoto : userPhoto}
-						/>
-					</div>
-				</div>
-				<div class="chat-header">
-					{sender === supportAgentCanonicalName ? supportAgentCanonicalName : data.user.given_name}
-					<time class="text-xs opacity-50"
-						>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time
-					>
-				</div>
-				<div class="bg-primary chat-bubble text-black"><p>{message}</p></div>
+	<div class="grid">
+		<div id="chat-container" class="h-[68vh] overflow-scroll  p-5">
+			<div>
+				{#each messages as { message, sender, type, dichot }, i}
+					{#if type === 'gpt'}
+						<div
+							class={`chat  ${sender === supportAgentCanonicalName ? 'chat-start' : 'chat-end'}`}
+						>
+							<div class="chat-image avatar">
+								<div class="w-10 rounded-full">
+									<img
+										alt="User avatar"
+										src={sender === supportAgentCanonicalName ? supportPhoto : userPhoto}
+									/>
+								</div>
+							</div>
+							<div class="chat-header">
+								{sender === supportAgentCanonicalName
+									? supportAgentCanonicalName
+									: data.user.given_name}
+								<time class="text-xs opacity-50"
+									>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time
+								>
+							</div>
+							<div class="bg-primary chat-bubble text-black"><p>{message}</p></div>
+						</div>
+					{:else if dichot?.question}
+						<div class="chat chat-start">
+							<div
+								class="chat-image
+								avatar"
+							>
+								<div class="w-10 rounded-full">
+									<img alt="User avatar" src={supportPhoto} />
+								</div>
+							</div>
+							<div class="chat-header">{sender}</div>
+							<div class="bg-primary chat-bubble text-black">
+								<p>{message}</p>
+								{#if dichot}
+									{#each dichot.options as option}
+										<button
+											class="btn btn-primary"
+											on:click={() => {
+												messages = [
+													...messages,
+													{
+														message: option.option,
+														sender: 'User',
+														type: 'gpt',
+														dichot: null
+													}
+												];
+												route = [...route, option.option];
+												handleClick(route);
+											}}
+										>
+											{option.option}
+										</button>
+									{/each}
+								{/if}
+							</div>
+						</div>
+					{:else if dichot?.result}
+						<div class="chat chat-start">
+							<div
+								class="chat-image
+								avatar"
+							>
+								<div class="w-10 rounded-full">
+									<img alt="User avatar" src={supportPhoto} />
+								</div>
+							</div>
+							<div class="chat-header">{sender}</div>
+							<div class="bg-primary chat-bubble text-black">
+								<h2>{dichot.result.result}</h2>
+								<p>{dichot.result.description}</p>
+								<ul>
+									{#each dichot.result.solution as solution}
+										<li>{solution}</li>
+									{/each}
+								</ul>
+							</div>
+						</div>
+					{/if}
+				{/each}
 			</div>
-		{/each}
+		</div>
 	</div>
-	<div>
-		<label class="input mt-2 input-bordered flex items-center gap-2">
+	<div class="absolute bottom-0 w-full p-5">
+		<label class="input input-bordered flex items-center gap-2">
 			<input
 				disabled={sendState}
 				type="text"

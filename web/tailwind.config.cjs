@@ -7,11 +7,11 @@ const config = {
     themes: [
       {
         fosternation: {
-          "primary": "#FFF18D",
-          "secondary": "#3b4555",
+          "primary": "#7AC5FF",
+          "secondary": "#FFFDFA",
           "accent": "#DAE1E9",
           "neutral": "#3d4451",
-          "base-100": "#DAE1E9",
+          "base-100": "#FFFDFA",
         },
       },
       "dark",

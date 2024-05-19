@@ -8,7 +8,7 @@ It is built as a web app which can be embedded as an ```iframe``` element. For t
 
 Authentication by Google (using Kinde) ensures absuse protection.
 
-## Challenges we ran into
+## Challenges I ran into
 
 None
 
